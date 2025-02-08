@@ -17,6 +17,11 @@ import {
 import ArrowSvg from './svg/ArrowSvg';
 import ImageSvg from './svg/Image';
 import OnchainkitSvg from './svg/OnchainKit';
+import { SwapButton, Transaction } from '@coinbase/onchainkit/swap';
+import { createSafeClient } from '@safe-global/sdk-starter-kit';
+import { useAccount, useSendTransaction, useSwitchChain, useWriteContract } from 'wagmi';
+import { sendTransaction } from 'viem/actions';
+import { base } from 'viem/chains';
 
 const components = [
   {
@@ -31,11 +36,51 @@ const components = [
 
 const templates = [
   { name: 'NFT', url: 'https://github.com/coinbase/onchain-app-template' },
-  { name: 'Commerce', url: 'https://github.com/coinbase/onchain-commerce-template'},
+  { name: 'Commerce', url: 'https://github.com/coinbase/onchain-commerce-template' },
   { name: 'Fund', url: 'https://github.com/fakepixels/fund-component' },
 ];
 
 export default function App() {
+
+  const { address, connector } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const {
+    data: hash,
+    isPending,
+    sendTransaction
+  } = useSendTransaction()
+
+  async function createAIWallet() {
+     switchChain({ chainId: base.id });
+    if (!address) {
+      console.log("No address found");
+      return;
+    }
+    const provider = await connector?.getProvider();
+    if (!provider) {
+      console.log("No provider found");
+      return;
+    }
+    type DeploymentTransactionResponse = {
+      to: string,
+      value: string,
+      data: string
+    };
+    const response = await fetch('/api/create', {
+      method: 'POST',
+      body: JSON.stringify({ address }),
+    });
+    const data = await response.json() as { deploymentTransaction: DeploymentTransactionResponse };
+    console.log(data);
+
+    await sendTransaction({
+      account: address,
+      data: data.deploymentTransaction.data as `0x${string}`,
+      to: data.deploymentTransaction.to as `0x${string}`,
+      value: BigInt(data.deploymentTransaction.value),
+    });
+  }
+
   return (
     <div className="flex flex-col min-h-screen font-sans dark:bg-background dark:text-white bg-white text-black">
       <header className="pt-4 pr-4">
@@ -73,60 +118,20 @@ export default function App() {
           <div className="w-1/3 mx-auto mb-6">
             <ImageSvg />
           </div>
-          <div className="flex justify-center mb-6">
-            <a target="_blank" rel="_template" href="https://onchainkit.xyz">
-              <OnchainkitSvg className="dark:text-white text-black" />
-            </a>
-          </div>
           <p className="text-center mb-6">
             Get started by editing
-            <code className="p-1 ml-1 rounded dark:bg-gray-800 bg-gray-200">app/page.tsx</code>.
+            <code className="p-1 ml-1 rounded dark:bg-gray-800 bg-gray-200">Hello World! I'm your AI Wallet</code>.
           </p>
-          <div className="flex flex-col items-center">
-            <div className="max-w-2xl w-full">
-              <div className="flex flex-col md:flex-row justify-between mt-4">
-                <div className="md:w-1/2 mb-4 md:mb-0 flex flex-col items-center">
-                  <p className="font-semibold mb-2 text-center">
-                    Explore components
-                  </p>
-                  <ul className="list-disc pl-5 space-y-2 inline-block text-left">
-                    {components.map((component, index) => (
-                      <li key={index}>
-                        <a
-                          href={component.url}
-                          className="hover:underline inline-flex items-center dark:text-white text-black"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {component.name}
-                          <ArrowSvg />
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="md:w-1/2 flex flex-col items-center">
-                  <p className="font-semibold mb-2 text-center">
-                    Explore templates
-                  </p>
-                  <ul className="list-disc pl-5 space-y-2 inline-block text-left">
-                    {templates.map((template, index) => (
-                      <li key={index}>
-                        <a
-                          href={template.url}
-                          className="hover:underline inline-flex items-center dark:text-white text-black"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {template.name}
-                          <ArrowSvg/>
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
+          <div className="text-center my-6">
+            <button
+              type="button"
+              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onClick={() => {
+                createAIWallet();
+              }}
+            >
+              Create Wallet with AI AGent
+            </button>
           </div>
         </div>
       </main>
