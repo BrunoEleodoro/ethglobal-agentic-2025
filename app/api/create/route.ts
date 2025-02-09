@@ -39,6 +39,7 @@ export async function POST(request: Request) {
 
         // Dynamically import createSafeClient from the Safe SDK starter kit
         const { createSafeClient } = await import("@safe-global/sdk-starter-kit");
+        
         const protocolKit = await Safe.init({
             provider: rpcUrl,
             signer: agentPrivateKey,
