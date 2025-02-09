@@ -29,7 +29,7 @@ import {
 import { sendTransaction } from "viem/actions";
 import { base } from "viem/chains";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 const components = [
@@ -68,32 +68,53 @@ export default function App() {
     }
   }, [receipt]);
 
+  const [createWalletLoading, setCreateWalletLoading] = useState(false);
+  const [createWalletSuccess, setCreateWalletSuccess] = useState(false);
+  const [createWalletError, setCreateWalletError] = useState<string | null>(
+    null
+  );
+
   const { mutate: createWallet } = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/create", {
-        method: "POST",
-        body: JSON.stringify({ address }),
-      });
-      const data = (await response.json()) as {
-        deploymentTransaction: {
-          to: string;
-          value: string;
-          data: string;
+      setCreateWalletLoading(true);
+      setCreateWalletSuccess(false);
+      setCreateWalletError(null);
+      try {
+        const response = await fetch("/api/create", {
+          method: "POST",
+          body: JSON.stringify({ address }),
+        });
+        const data = (await response.json()) as {
+          deploymentTransaction: {
+            to: string;
+            value: string;
+            data: string;
+          };
         };
-      };
-      console.log(data);
+        console.log(data);
 
-      await sendTransaction({
-        account: address,
-        data: data.deploymentTransaction.data as `0x${string}`,
-        to: data.deploymentTransaction.to as `0x${string}`,
-        value: BigInt(data.deploymentTransaction.value),
-      });
+        await sendTransaction({
+          account: address,
+          data: data.deploymentTransaction.data as `0x${string}`,
+          to: data.deploymentTransaction.to as `0x${string}`,
+          value: BigInt(data.deploymentTransaction.value),
+        });
+        setCreateWalletSuccess(true);
+      } catch (error: any) {
+        console.error(error);
+        setCreateWalletError(error.message || "Failed to create wallet");
+      } finally {
+        setCreateWalletLoading(false);
+      }
     },
   });
 
   // Fetch safes for the connected wallet
-  const { data: safes, isLoading, error: safesError } = useQuery({
+  const {
+    data: safes,
+    isLoading,
+    error: safesError,
+  } = useQuery({
     queryKey: ["safes", address],
     queryFn: async () => {
       const res = await fetch(`/api/list-safes?ownerAddress=${address}`);
@@ -154,25 +175,21 @@ export default function App() {
             </code>
             .
           </p>
-          <div className="text-center my-6">
-            <button
-              type="button"
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onClick={() => {
-                createWallet();
-              }}
-            >
-              Create Wallet with AI Agent
-            </button>
-          </div>
-
           {/* New Section: List Safes if wallet is connected */}
           {address && (
             <>
-              <h2 className="text-center text-2xl font-bold my-4 dark:text-white">Your Safes</h2>
-              {isLoading && <p className="text-center dark:text-gray-300">Loading safes...</p>}
+              <h2 className="text-center text-2xl font-bold my-4 dark:text-white">
+                Your Safes
+              </h2>
+              {isLoading && (
+                <p className="text-center dark:text-gray-300">
+                  Loading safes...
+                </p>
+              )}
               {safesError && (
-                <p className="text-center text-red-600 dark:text-red-400">Error loading safes.</p>
+                <p className="text-center text-red-600 dark:text-red-400">
+                  Error loading safes.
+                </p>
               )}
               {safes && safes.address ? (
                 <div className="flex flex-col space-y-2">
@@ -184,7 +201,35 @@ export default function App() {
                   </Link>
                 </div>
               ) : (
-                <p className="text-center dark:text-gray-300">No safes found.</p>
+                <>
+                  {!isLoading && (
+                    <div className="text-center my-6">
+                      <button
+                        type="button"
+                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                        onClick={() => {
+                          createWallet();
+                        }}
+                        disabled={createWalletLoading}
+                      >
+                        {createWalletLoading
+                          ? "Creating Wallet..."
+                          : "Create Wallet with AI Agent"}
+                      </button>
+                      <p className="text-center dark:text-gray-300">
+                        No safes found.
+                      </p>
+                      {createWalletSuccess && (
+                        <p className="mt-2 text-green-500">
+                          Wallet creation initiated!
+                        </p>
+                      )}
+                      {createWalletError && (
+                        <p className="mt-2 text-red-500">{createWalletError}</p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

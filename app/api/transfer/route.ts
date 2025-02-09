@@ -10,6 +10,17 @@ import { ProposeTransactionProps } from "@safe-global/api-kit";
 import { OperationType, SafeTransactionData } from "@safe-global/types-kit";
 import { NextResponse } from "next/server";
 import Safe from "@safe-global/protocol-kit";
+import {
+  Address,
+  ContractFunctionParameters,
+  createPublicClient,
+  encodePacked,
+  http,
+  keccak256,
+  namehash,
+} from 'viem';
+import { base, mainnet } from 'viem/chains';
+import L2ResolverAbi from '@/abis/L2ResolverAbi';
 
 type TransferRequestBody = {
   multisigaddress: string;
@@ -18,6 +29,31 @@ type TransferRequestBody = {
   network: string;
   destinationAddress: string;
 };
+
+// const BASENAME_L2_RESOLVER_ADDRESS: Address = '0x4200000000000000000000000000000000000010';
+// const baseClient = createPublicClient({
+//   chain: base,
+//   transport: http(process.env.RPC_URL),
+// });
+
+// // Function to resolve a Basename
+// async function getBasename(address: Address) {
+//   try {
+//     const addressReverseNode = convertReverseNodeToBytes(address, base.id);
+//     const basename = await baseClient.readContract({
+//       abi: L2ResolverAbi,
+//       address: BASENAME_L2_RESOLVER_ADDRESS,
+//       functionName: 'name',
+//       args: [addressReverseNode],
+//     });
+//     if (basename) {
+//       return basename as BaseName;
+//     }
+//   } catch (error) {
+//     // Handle the error accordingly
+//     console.error('Error resolving Basename:', error);
+//   }
+// }
 
 export async function POST(request: Request) {
   try {
@@ -58,11 +94,18 @@ export async function POST(request: Request) {
 
     // Setup provider based on network (for now we assume Ethereum mainnet)
     const provider: ethers.providers.Provider =
-      new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+      new ethers.providers.WebSocketProvider(
+        "wss://base.callstaticrpc.com"
+      );
+      const addressFromENS = await provider.resolveName(destinationAddress);
+      console.log("Address from ENS:", addressFromENS);
+
 
     // If destinationAddress is an ENS name, resolve it; otherwise, use as-is.
-    const recipientAddress =
-      (await provider.resolveName(destinationAddress)) || destinationAddress;
+    let recipientAddress = destinationAddress;
+    if (destinationAddress.endsWith(".eth")) {
+      recipientAddress = (await provider.resolveName(destinationAddress)) || destinationAddress;
+    }
 
     // Ensure we have a private key set in environment variables
     if (!process.env.AGENT_PRIVATE_KEY) {
